@@ -12,14 +12,14 @@ class EventTicketing(ARC4Contract):
     def create_application(self, num_of_tickets: UInt64, ticket_price: UInt64) -> None:
         assert num_of_tickets > 0, 'Number of tickets must be greater than 0'
         self.ticket_price = ticket_price
-        self.asset_created = True
         self.num_of_tickets = num_of_tickets
+        self.asset_created = False
     
     # bootstrap ticket asset
     @arc4.abimethod
     def bootstrap_ticket_asset(self, mbr_pay: gtxn.PaymentTransaction) -> UInt64:
         assert Txn.sender == Global.creator_address
-        assert self.asset_created == False
+        assert not self.asset_created
 
         assert mbr_pay.receiver == Global.current_application_address
         assert mbr_pay.amount >= Global.min_balance + Global.asset_create_min_balance
@@ -36,8 +36,10 @@ class EventTicketing(ARC4Contract):
         )
 
         self.asset_id = asset_id
+        self.asset_created = True
 
         log(asset_id)
+
 
         return self.asset_id
 
@@ -63,6 +65,7 @@ class EventTicketing(ARC4Contract):
         assert buyer_txn.receiver == Global.current_application_address
         assert buyer_txn.amount == self.ticket_price, 'Wrong price provided'
         assert self.num_of_tickets > 0, 'No tickets left'
+        assert self.asset_created, 'Asset not created'
 
         ticket_asset = Asset(self.asset_id)
         assert Txn.sender.is_opted_in(ticket_asset), 'Asset not opted in'
@@ -74,6 +77,14 @@ class EventTicketing(ARC4Contract):
             asset_amount=1,
             fee=0,
         ).submit()
+
+        # itxn.AssetFreeze(
+        #     freeze_asset=self.asset_id,
+        #     freeze_account=buyer_txn.sender,
+        #     fee=0,
+        #     frozen=False,
+        #     sender=Global.current_application_address,
+        # ).submit()
 
         self.num_of_tickets = self.num_of_tickets - 1
 
